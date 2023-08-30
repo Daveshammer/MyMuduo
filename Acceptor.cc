@@ -45,13 +45,15 @@ void Acceptor::listen()
 }
 
 // listenfd有事件发生了，就是有新用户连接了
+// mainReactor上的acceptor调用TcpServer::newConnection,为connfd指定eventloop(subloop),(TCPConnection)设置读写回调. 
+// 然后调用subloop的runInLoop->queueInLoop->wakeup(), subloop从epoll_wait中离开，执行connectionEstablished
 void Acceptor::handleRead()
 {
     InetAddress peerAddr;
     int connfd = acceptSocket_.accept(&peerAddr);
     if (connfd >= 0)
     {
-        if (newConnectionCallback_)
+        if (newConnectionCallback_) // TcpServer::newConnection
         {
             newConnectionCallback_(connfd, peerAddr); // 轮询找到subLoop，唤醒，分发当前的新客户端的Channel
         }

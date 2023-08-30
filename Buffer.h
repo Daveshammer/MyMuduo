@@ -4,6 +4,13 @@
 #include <string>
 #include <algorithm>
 
+/// +-------------------+------------------+------------------+
+/// | prependable bytes |  readable bytes  |  writable bytes  |
+/// |                   |     (CONTENT)    |                  |
+/// +-------------------+------------------+------------------+
+/// |                   |                  |                  |
+/// 0      <=      readerIndex   <=   writerIndex    <=     size
+
 // 网络库底层的缓冲器类型定义
 class Buffer
 {

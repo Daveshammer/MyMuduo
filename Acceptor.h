@@ -8,6 +8,7 @@
 class EventLoop;
 class InetAddress;
 
+// mainloop中的 封装listenfd、相关事件及回调(监听、接受连接、分发连接给subLoop)
 class Acceptor : noncopyable
 {
 public:

@@ -45,7 +45,7 @@ public:
     // 判断EventLoop对象是否在自己的线程里面
     bool isInLoopThread() const { return threadId_ ==  CurrentThread::tid(); }
 private:
-    void handleRead(); // wake up
+    void handleRead(); // 处理wakeup
     void doPendingFunctors(); // 执行回调
 
     using ChannelList = std::vector<Channel*>;

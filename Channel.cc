@@ -10,7 +10,12 @@ const int Channel::kWriteEvent = EPOLLOUT;
 
 // EventLoop: ChannelList Poller
 Channel::Channel(EventLoop *loop, int fd)
-    : loop_(loop), fd_(fd), events_(0), revents_(0), index_(-1), tied_(false)
+    : loop_(loop)
+    , fd_(fd)
+    , events_(0)
+    , revents_(0)
+    , index_(-1)
+    , tied_(false)
 {
 }
 
@@ -29,7 +34,7 @@ void Channel::tie(const std::shared_ptr<void> &obj)
  * 当改变channel所表示fd的events事件后，update负责在poller里面更改fd相应的事件epoll_ctl
  * EventLoop => ChannelList   Poller
  */ 
-void Channel::update()
+void Channel::update() //将fd及evens_注册在epoll Tree上
 {
     // 通过channel所属的EventLoop，调用poller的相应方法，注册fd的events事件
     loop_->updateChannel(this);
@@ -42,17 +47,20 @@ void Channel::remove()
 }
 
 // fd得到poller通知以后，处理事件的
+// channel在handleEvent之前，lock提升为强智能指针(TcpConnection的引用计数+1)
+//（在lock之后 TcpConnection的引用计数才+1），防止在handleEvent的时候TcpConnection被析构，
+// 进而把当前正在调用的channel对象给析构，发生未定义事件。
 void Channel::handleEvent(Timestamp receiveTime)
 {
-    if (tied_)
+    if (tied_) // channel的所有者是TcpConnection对象
     {
-        std::shared_ptr<void> guard = tie_.lock();
+        std::shared_ptr<void> guard = tie_.lock(); // 提升成shared_ptr 防止在handleEvent的时候TcpConnection析构
         if (guard)
         {
             handleEventWithGuard(receiveTime);
         }
     }
-    else
+    else // channel的所有者是Acceptor对象，没必要tie，因为Acceptor监听连接会贯穿server始终
     {
         handleEventWithGuard(receiveTime);
     }

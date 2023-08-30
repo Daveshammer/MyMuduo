@@ -10,6 +10,7 @@
 
 class EventLoop;
 
+// subReactor，将loop和thread结合在一起，实现 one loop per thread
 class EventLoopThread : noncopyable
 {
 public:

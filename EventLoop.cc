@@ -27,7 +27,12 @@ int createEventfd()
 }
 
 EventLoop::EventLoop()
-    : looping_(false), quit_(false), callingPendingFunctors_(false), threadId_(CurrentThread::tid()), poller_(Poller::newDefaultPoller(this)), wakeupFd_(createEventfd()), wakeupChannel_(new Channel(this, wakeupFd_))
+    : looping_(false), quit_(false)
+    , callingPendingFunctors_(false)
+    , threadId_(CurrentThread::tid())
+    , poller_(Poller::newDefaultPoller(this))
+    , wakeupFd_(createEventfd())
+    , wakeupChannel_(new Channel(this, wakeupFd_))
 {
     LOG_DEBUG("EventLoop created %p in thread %d \n", this, threadId_);
     if (t_loopInThisThread)
@@ -65,13 +70,17 @@ void EventLoop::loop()
     {
         activeChannels_.clear();
         // 监听两类fd   一种是client的fd，一种wakeupfd
+        //  对于mainReactor的loop, 负责监听listenfd, handler : 接收新来的连接 并将新来的连接派发给subReactor(其他thread的eventloop)
+        //  对于subReactor的loop, 负责监听connfd, handler : 处理 已连接socket上发生的事件.可以在subreactor的ioloop中处理 也可将任务打包提交给线程池处理
+        // 事件分发机制概述:每个eventloop都有一个eventfd,其注册在自己loop的epoll上. 外界在想唤醒eventloop,让他处理事件的时候,
+        // 就向eventloop放入处理事件的callback,然后通过wakeup()向eventFd写8bytes,将eventloope从poll_wait唤醒，处理放入的callback.
         pollReturnTime_ = poller_->poll(kPollTimeMs, &activeChannels_);
         for (Channel *channel : activeChannels_)
         {
             // Poller监听哪些channel发生事件了，然后上报给EventLoop，通知channel处理相应的事件
             channel->handleEvent(pollReturnTime_);
         }
-        // 执行当前EventLoop事件循环需要处理的回调操作
+        // 执行当前EventLoop事件循环需要处理的回调操作（可能是本thread或其他thread）
         /**
          * IO线程 mainLoop accept fd《=channel subloop
          * mainLoop 事先注册一个回调cb（需要subloop来执行）    wakeup subloop后，执行下面的方法，执行之前mainloop注册的cb操作
@@ -123,14 +132,15 @@ void EventLoop::queueInLoop(Functor cb)
     }
 
     // 唤醒相应的，需要执行上面回调操作的loop的线程了
-    // || callingPendingFunctors_的意思是：当前loop正在执行回调，但是loop又有了新的回调
+    // || callingPendingFunctors_的意思是：当前loop正在执行回调，但是loop又有了新的回调，若没有唤醒需要等到下次poll wait之后才会被处理
     if (!isInLoopThread() || callingPendingFunctors_)
     {
         wakeup(); // 唤醒loop所在线程
     }
 }
 
-void EventLoop::handleRead()
+//处理eventFd的读事件
+void EventLoop::handleRead() 
 {
     uint64_t one = 1;
     ssize_t n = read(wakeupFd_, &one, sizeof one);
@@ -174,7 +184,7 @@ void EventLoop::doPendingFunctors() // 执行回调
 
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        functors.swap(pendingFunctors_);
+        functors.swap(pendingFunctors_); // 减小了临界区的长度，使得doPendingFunctor 和 queueInLoop可以并发执行
     }
 
     for (const Functor &functor : functors)

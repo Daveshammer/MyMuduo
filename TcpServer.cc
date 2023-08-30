@@ -18,7 +18,15 @@ TcpServer::TcpServer(EventLoop *loop,
                      const InetAddress &listenAddr,
                      const std::string &nameArg,
                      Option option)
-    : loop_(CheckLoopNotNull(loop)), ipPort_(listenAddr.toIpPort()), name_(nameArg), acceptor_(new Acceptor(loop, listenAddr, option == kReusePort)), threadPool_(new EventLoopThreadPool(loop, name_)), connectionCallback_(), messageCallback_(), nextConnId_(1), started_(0)
+    : loop_(CheckLoopNotNull(loop))
+    , ipPort_(listenAddr.toIpPort())
+    , name_(nameArg)
+    , acceptor_(new Acceptor(loop, listenAddr, option == kReusePort))
+    , threadPool_(new EventLoopThreadPool(loop, name_))
+    , connectionCallback_()
+    , messageCallback_()
+    , nextConnId_(1)
+    , started_(0)
 {
     // 当有先用户连接时，会执行TcpServer::newConnection回调
     acceptor_->setNewConnectionCallback(std::bind(&TcpServer::newConnection, this,
@@ -55,7 +63,7 @@ void TcpServer::start()
     }
 }
 
-// 有一个新的客户端的连接，acceptor会执行这个回调操作
+// 有一个新的客户端的连接，eventloop会调用acceptor的hanldleRead
 void TcpServer::newConnection(int sockfd, const InetAddress &peerAddr)
 {
     // 轮询算法，选择一个subLoop，来管理channel
@@ -99,6 +107,7 @@ void TcpServer::newConnection(int sockfd, const InetAddress &peerAddr)
     ioLoop->runInLoop(std::bind(&TcpConnection::connectEstablished, conn));
 }
 
+// poller -> channel::closeCallback -> TcpConnection::handleClose -> TcpServer::removeConnection -> TcpConnection::connectionDestoyed
 void TcpServer::removeConnection(const TcpConnectionPtr &conn)
 {
     loop_->runInLoop(

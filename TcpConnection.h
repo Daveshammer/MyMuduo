@@ -19,6 +19,7 @@ class Socket;
  * =》 TcpConnection 设置回调 =》 Channel =》 Poller =》 Channel的回调操作
  * 
  */ 
+// subloop中的 封装已连接connfd、相关事件及回调(读消息事件、发送消息事件、连接关闭事件、错误事件等)
 class TcpConnection : noncopyable, public std::enable_shared_from_this<TcpConnection>
 {
 public:
@@ -41,19 +42,19 @@ public:
     // 关闭连接
     void shutdown();
 
-    void setConnectionCallback(const ConnectionCallback& cb)
+    void setConnectionCallback(const ConnectionCallback& cb) // 用户设置的回调
     { connectionCallback_ = cb; }
 
-    void setMessageCallback(const MessageCallback& cb)
+    void setMessageCallback(const MessageCallback& cb) // 用户设置的回调
     { messageCallback_ = cb; }
 
-    void setWriteCompleteCallback(const WriteCompleteCallback& cb)
+    void setWriteCompleteCallback(const WriteCompleteCallback& cb) // 用户设置的回调
     { writeCompleteCallback_ = cb; }
 
-    void setHighWaterMarkCallback(const HighWaterMarkCallback& cb, size_t highWaterMark)
+    void setHighWaterMarkCallback(const HighWaterMarkCallback& cb, size_t highWaterMark) // 用户设置的回调
     { highWaterMarkCallback_ = cb; highWaterMark_ = highWaterMark; }
 
-    void setCloseCallback(const CloseCallback& cb)
+    void setCloseCallback(const CloseCallback& cb) // TcpServer::removeConnection
     { closeCallback_ = cb; }
 
     // 连接建立
@@ -88,7 +89,7 @@ private:
     MessageCallback messageCallback_; // 有读写消息时的回调
     WriteCompleteCallback writeCompleteCallback_; // 消息发送完成以后的回调
     HighWaterMarkCallback highWaterMarkCallback_;
-    CloseCallback closeCallback_;
+    CloseCallback closeCallback_; // TcpServer::removeConnection
     size_t highWaterMark_;
 
     Buffer inputBuffer_;  // 接收数据的缓冲区

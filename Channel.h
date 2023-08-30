@@ -10,9 +10,10 @@ class EventLoop;
 
 /**
  * 理清楚  EventLoop、Channel、Poller之间的关系   《= Reactor模型上对应 Demultiplex
- * Channel 理解为通道，封装了sockfd和其感兴趣的event，如EPOLLIN、EPOLLOUT事件
+ * Channel 理解为通道，封装了sockfd和其感兴趣的event，如EPOLLIN、EPOLLOUT事件，以及回调函数handler
  * 还绑定了poller返回的具体事件
- */ 
+ */
+//实际使用中可分为三种channel : acceptChannel(listengingfd) , connfdChannel,(connfd) wakeupChannel(wakeupFd) 
 class Channel : noncopyable
 {
 public:
@@ -25,10 +26,10 @@ public:
     // fd得到poller通知以后，处理事件的
     void handleEvent(Timestamp receiveTime);  
 
-    // 设置回调函数对象 （//Channel绑定的是TcpConnection对象的成员方法，需要保证调用时TcpConnection对象存在，所以需要tie）
-    void setReadCallback(ReadEventCallback cb) { readCallback_ = std::move(cb); }
-    void setWriteCallback(EventCallback cb) { writeCallback_ = std::move(cb); }
-    void setCloseCallback(EventCallback cb) { closeCallback_ = std::move(cb); }
+    // 设置回调函数对象，这些callback最终都会在loop的handleEvent中被调用
+    void setReadCallback(ReadEventCallback cb) { readCallback_ = std::move(cb); } //Acceptor::handleRead或者TcpConnection::handleRead
+    void setWriteCallback(EventCallback cb) { writeCallback_ = std::move(cb); } // TcpConnection::handleWrite
+    void setCloseCallback(EventCallback cb) { closeCallback_ = std::move(cb); } // TcpConnection::handleClose
     void setErrorCallback(EventCallback cb) { errorCallback_ = std::move(cb); }
 
     // 防止当channel被手动remove掉，channel还在执行回调操作
@@ -38,7 +39,7 @@ public:
     int events() const { return events_; }
     void set_revents(int revt) { revents_ = revt; }
 
-    // 设置fd相应的事件状态
+    // 设置fd感兴趣的事件，loop会调用update更新channel
     void enableReading() { events_ |= kReadEvent; update(); }
     void disableReading() { events_ &= ~kReadEvent; update(); }
     void enableWriting() { events_ |= kWriteEvent; update(); }
@@ -58,7 +59,7 @@ public:
     void remove();
 private:
 
-    void update();
+    void update(); //将fd及evens_注册在epoll Tree上
     void handleEventWithGuard(Timestamp receiveTime);
 
     static const int kNoneEvent;
@@ -75,9 +76,9 @@ private:
     bool tied_;
 
     // 因为channel通道里面能够获知fd最终发生的具体的事件revents，所以它负责调用具体事件的回调操作
-    ReadEventCallback readCallback_;
-    EventCallback writeCallback_;
-    EventCallback closeCallback_;
+    ReadEventCallback readCallback_; //Acceptor::handleRead或者TcpConnection::handleRead
+    EventCallback writeCallback_; // TcpConnection::handleWrite
+    EventCallback closeCallback_; // TcpConnection::handleClose
     EventCallback errorCallback_;
 };
 

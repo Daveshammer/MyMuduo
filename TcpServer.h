@@ -37,7 +37,7 @@ public:
     ~TcpServer();
 
     void setThreadInitcallback(const ThreadInitCallback &cb) { threadInitCallback_ = cb; }
-    void setConnectionCallback(const ConnectionCallback &cb) { connectionCallback_ = cb; }
+    void setConnectionCallback(const ConnectionCallback &cb) { connectionCallback_ = cb; } // 用户设置的回调
     void setMessageCallback(const MessageCallback &cb) { messageCallback_ = cb; }
     void setWriteCompleteCallback(const WriteCompleteCallback &cb) { writeCompleteCallback_ = cb; }
 
